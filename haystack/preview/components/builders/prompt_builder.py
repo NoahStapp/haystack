@@ -90,6 +90,7 @@ class PromptBuilder:
             # treat vars as optional input slots
             dynamic_input_slots = {var: Optional[Any] for var in template_variables}
             self.template = None
+            component.set_output_types(self, prompt=List[ChatMessage])
 
         # static templating
         else:
@@ -100,6 +101,7 @@ class PromptBuilder:
             static_template_variables = meta.find_undeclared_variables(ast)
             # treat vars as required input slots - as per design
             dynamic_input_slots = {var: Any for var in static_template_variables}
+            component.set_output_types(self, prompt=str)
 
         # always provide all serialized vars, so we can serialize
         # the component regardless of the initialization method (static vs. dynamic)
@@ -112,7 +114,6 @@ class PromptBuilder:
     def to_dict(self) -> Dict[str, Any]:
         return default_to_dict(self, template=self._template_string, template_variables=self.template_variables)
 
-    @component.output_types(prompt=str)
     def run(self, messages: Optional[List[ChatMessage]] = None, **kwargs):
         """
         Build and return the prompt based on the provided messages and template or template variables.
