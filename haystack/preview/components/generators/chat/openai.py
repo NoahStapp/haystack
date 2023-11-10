@@ -150,10 +150,11 @@ class GPTChatGenerator:
         return default_from_dict(cls, data)
 
     @component.output_types(replies=List[ChatMessage])
-    def run(self, messages: List[ChatMessage], generation_kwargs: Optional[Dict[str, Any]] = None):
+    def run(self, prompt: str, messages: List[ChatMessage], generation_kwargs: Optional[Dict[str, Any]] = None):
         """
         Invoke the text generation inference based on the provided messages and generation parameters.
 
+        :param prompt: The prompt to use for text generation.
         :param messages: A list of ChatMessage instances representing the input messages.
         :param generation_kwargs: Additional keyword arguments for text generation. These parameters will
         potentially override the parameters passed in the __init__ method.
@@ -166,7 +167,7 @@ class GPTChatGenerator:
         generation_kwargs = {**self.generation_kwargs, **(generation_kwargs or {})}
 
         # adapt ChatMessage(s) to the format expected by the OpenAI API
-        openai_formatted_messages = self._convert_to_openai_format(messages)
+        openai_formatted_messages = self._convert_to_openai_format(messages + [ChatMessage.from_user(prompt)])
 
         completion = openai.ChatCompletion.create(
             model=self.model_name,
