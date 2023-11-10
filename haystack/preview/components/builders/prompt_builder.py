@@ -69,7 +69,7 @@ class PromptBuilder:
 
     """
 
-    def __init__(self, template: Optional[str] = None, template_variables: Optional[List[str]] = None):
+    def __init__(self, template: Optional[str] = None):
         """
         Initialize the component with either a template string or template variables.
         If template is given PromptBuilder will parse the template string and use the template variables
@@ -80,22 +80,15 @@ class PromptBuilder:
         an error will be raised as well.
 
         :param template: Template string to be rendered.
-        :param template_variables: List of template variables to be used as input types.
         """
-        if template_variables and template:
-            raise ValueError("template and template_variables cannot be provided at the same time.")
-
         # dynamic per-user message templating
-        if template_variables:
-            # treat vars as optional input slots
-            dynamic_input_slots = {var: Optional[Any] for var in template_variables}
+        if not template:
+            dynamic_input_slots = {}
             self.template = None
             component.set_output_types(self, prompt=List[ChatMessage])
 
         # static templating
         else:
-            if not template:
-                raise ValueError("Either template or template_variables must be provided.")
             self.template = Template(template)
             ast = self.template.environment.parse(template)
             static_template_variables = meta.find_undeclared_variables(ast)
@@ -105,16 +98,20 @@ class PromptBuilder:
 
         # always provide all serialized vars, so we can serialize
         # the component regardless of the initialization method (static vs. dynamic)
-        self.template_variables = template_variables
         self._template_string = template
 
-        optional_input_slots = {"messages": Optional[List[ChatMessage]]}
+        optional_input_slots = {"messages": Optional[List[ChatMessage]], "template_variables": Optional[List[str]]}
         component.set_input_types(self, **optional_input_slots, **dynamic_input_slots)
 
     def to_dict(self) -> Dict[str, Any]:
-        return default_to_dict(self, template=self._template_string, template_variables=self.template_variables)
+        return default_to_dict(self, template=self._template_string)
 
-    def run(self, messages: Optional[List[ChatMessage]] = None, **kwargs):
+    def run(
+        self,
+        messages: Optional[List[ChatMessage]] = None,
+        template_variables: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ):
         """
         Build and return the prompt based on the provided messages and template or template variables.
         If `messages` are provided, the template will be applied to the last user message.
@@ -129,7 +126,9 @@ class PromptBuilder:
             last_message: ChatMessage = messages[-1]
             if last_message.is_from(ChatRole.USER):
                 template = Template(last_message.content)
-                return {"prompt": messages[:-1] + [ChatMessage.from_user(template.render(kwargs))]}
+                if template_variables:
+                    return {"prompt": messages[:-1] + [ChatMessage.from_user(template.render(template_variables))]}
+                return {"prompt": messages}
             else:
                 return {"prompt": messages}
         else:
